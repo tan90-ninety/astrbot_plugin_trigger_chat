@@ -1,10 +1,12 @@
 {
   "keywords": {
-    "description": "唤醒词",
+    "description": "触发关键词",
+    "hint": "群聊消息包含任一关键词时触发 LLM；单独发送关键词时优先使用上一条历史消息",
     "type": "list"
   },
   "at_prompt": {
-    "description": "单独 @ 机器人时发送给 LLM 的默认提示词",
+    "description": "默认提示词",
+    "hint": "单独 @ 或单独关键词触发且没有可用历史消息时，发送给 LLM 的提示词",
     "type": "string",
     "default": "请根据上下文自然回复一下。如果上下文不足，请主动询问我需要你帮忙的具体内容。"
   }
