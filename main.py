@@ -8,8 +8,6 @@ from .services.config import get_at_prompt, get_keywords
 from .services.history import MessageHistory
 from .services.triggers import contains_keyword, is_only_at_bot
 
-
-@register("trigger_chat", "Tan", "关键词触发 LLM 对话", "0.0.1")
 class TriggerChatPlugin(Star):
     """关键词或单独 @ 触发 AstrBot 默认聊天流程的插件。"""
 
