@@ -27,3 +27,10 @@ def contains_keyword(message: str, keywords: list[str]) -> bool:
     判断文本是否包含任意配置关键词。
     """
     return bool(message and any(keyword in message for keyword in keywords))
+
+
+def is_only_keyword(message: str, keywords: list[str]) -> bool:
+    """
+    判断文本是否只是一条独立关键词。
+    """
+    return bool(message and any(message == keyword for keyword in keywords))

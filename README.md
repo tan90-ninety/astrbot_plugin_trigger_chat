@@ -1,14 +1,242 @@
-# astrbot-plugin-helloworld
+# 对话触发
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+`trigger_chat` 是一个 AstrBot 群聊触发插件，用于在群聊中通过关键词或单独 @ 机器人触发 AstrBot 默认 LLM 对话流程。
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+插件本身不直接回复消息，而是把符合条件的群聊消息转换成 AstrBot 默认聊天请求，由 AstrBot 的 LLM 和回复流程继续处理。
 
-# Supports
+## 功能
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+- 支持群聊关键词触发默认 LLM 对话。
+- 支持群聊单独 @ 机器人触发默认 LLM 对话。
+- 非触发消息会按群和用户缓存为短期上下文。
+- 单独 @ 或单独关键词触发时，会读取当前用户最近 3 条、3 分钟内的历史消息作为提示词。
+- 如果没有可用历史消息，会使用配置项 `at_prompt` 作为兜底提示词。
+- 如果用户发送的是 `xxxx关键词xxxxx` 这种包含关键词的完整消息，会直接使用当前消息作为提示词。
+- 仅在群聊消息中生效，不处理私聊。
+- 保留 AstrBot 原有的 @、`wake_prefix` 等默认触发能力。
+
+## 项目结构
+
+```text
+.
+├── main.py                 # 插件入口，负责串联触发判断和 LLM prompt 设置
+├── _conf_schema.json       # 插件配置 schema
+├── metadata.yaml           # AstrBot 插件元信息
+├── services/
+│   ├── __init__.py         # 内部服务模块声明
+│   ├── config.py           # 配置读取工具
+│   ├── history.py          # 群聊用户短期消息缓存
+│   └── triggers.py         # 触发条件判断工具
+├── README.md
+└── LICENSE
+```
+
+## 配置
+
+配置项说明：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `keywords` | `list` | 无 | 群聊触发关键词列表。消息包含任意关键词即可触发。 |
+| `at_prompt` | `string` | `你看看` | 单独 @ 或单独关键词触发，但没有可用历史消息时发送给 LLM 的兜底提示词。 |
+
+## 使用方法
+
+1. 将插件放入 AstrBot 插件目录。
+2. 在 AstrBot 插件管理中启用 `trigger_chat`。
+3. 在插件配置中填写 `keywords` 和 `at_prompt`。
+4. 确保 AstrBot 的 LLM provider 已启用，否则插件只能触发流程，无法获得 AI 回复。
+5. 在群聊中发送普通消息积累上下文，然后用关键词或单独 @ 触发对话。
+
+## 触发规则
+
+### 1. 普通消息进入历史缓存
+
+没有命中关键词，也不是单独 @ 机器人的群聊消息，会被缓存为历史消息。
+
+缓存规则：
+
+- 按群号和发送者 ID 隔离。
+- 每个用户最多保留最近 3 条。
+- 只保留 3 分钟内的消息。
+- 空文本不会进入缓存。
+
+### 2. 单独 @ 机器人
+
+如果消息只 @ 机器人，且除 @ 之外没有其他非空文本，会触发 LLM 对话。
+
+插件会优先使用当前群、当前用户最近 3 条、3 分钟内的历史消息作为提示词。
+
+如果没有历史消息，则使用 `at_prompt`。
+
+### 3. 单独关键词
+
+如果消息内容等于某个关键词，例如：
+
+```text
+帮我看看
+```
+
+插件会把它当作“触发指令”，优先使用历史消息作为提示词。
+
+如果没有历史消息，则使用 `at_prompt`。
+
+### 4. 包含关键词的完整消息
+
+如果消息包含关键词，但不是单独关键词，例如：
+
+```text
+这个接口一直 500，帮我看看可能是什么问题
+```
+
+插件会直接使用当前完整消息作为提示词，不再读取历史消息。
+
+## 使用示例
+
+假设配置如下：
+
+```json
+{
+  "keywords": ["帮我看看", "机器人"],
+  "at_prompt": "你看看"
+}
+```
+
+### 示例 1：单独 @，使用历史消息
+
+群聊中用户发送：
+
+```text
+用户A：这个接口最近经常超时
+用户A：偶尔还会返回 500
+用户A：日志里没有明显异常
+用户A：@机器人
+```
+
+实际发送给 LLM 的提示词：
+
+```text
+这个接口最近经常超时
+偶尔还会返回 500
+日志里没有明显异常
+```
+
+群聊中的效果类似：
+
+```text
+用户A：@机器人
+机器人：可以先从超时链路、上游依赖和异常日志采集三个方向排查。建议先给超时请求加 request id，串起完整调用链。
+```
+
+### 示例 2：单独关键词，使用历史消息
+
+群聊中用户发送：
+
+```text
+用户A：这段代码偶尔会空指针
+用户A：但本地复现不了
+用户A：帮我看看
+```
+
+实际发送给 LLM 的提示词：
+
+```text
+这段代码偶尔会空指针
+但本地复现不了
+```
+
+### 示例 3：包含关键词的完整消息，使用当前消息
+
+群聊中用户发送：
+
+```text
+用户A：这个接口一直 500，帮我看看可能是什么问题
+```
+
+实际发送给 LLM 的提示词：
+
+```text
+这个接口一直 500，帮我看看可能是什么问题
+```
+
+### 示例 4：没有历史消息时使用 at_prompt
+
+群聊中用户发送：
+
+```text
+用户A：@机器人
+```
+
+如果用户A在当前群 3 分钟内没有可用历史消息，实际发送给 LLM 的提示词：
+
+```text
+你看看
+```
+
+单独关键词也一样：
+
+```text
+用户A：帮我看看
+```
+
+没有历史时，实际发送给 LLM 的提示词也是：
+
+```text
+你看看
+```
+
+### 示例 5：只使用当前用户、当前群的历史
+
+群聊中用户发送：
+
+```text
+用户A：这个接口报错
+用户B：可能是数据库问题
+用户A：日志里有 500
+用户A：帮我看看
+```
+
+实际发送给 LLM 的提示词：
+
+```text
+这个接口报错
+日志里有 500
+```
+
+用户B的消息不会被合并进去。
+
+## 实际发送机制
+
+```text
+群聊消息
+  ↓
+插件判断触发条件
+  ↓
+构造 LLM prompt
+  ↓
+AstrBot 默认 LLM 流程
+  ↓
+AstrBot RespondStage 发送回复
+```
+
+## 注意事项
+
+- 历史消息缓存在插件进程内内存中，AstrBot 重启后会清空。
+- 历史缓存只记录非触发消息，触发消息本身不会进入历史缓存。
+- 单独关键词必须与配置中的关键词完全一致，例如消息 `帮我看看` 等于关键词 `帮我看看`。
+- 包含关键词的完整消息会直接作为提示词发送给 LLM，例如 `这个问题帮我看看`。
+- 如果 AstrBot 的 LLM provider 未启用或当前会话禁用了 AI 能力，插件不会产生 AI 回复。
+
+## 支持平台
+
+当前 `metadata.yaml` 声明支持：
+
+```yaml
+support_platforms:
+  - aiocqhttp
+```
+
+## 相关链接
+
+- [AstrBot](https://github.com/AstrBotDevs/AstrBot)
+- [AstrBot 插件开发文档](https://docs.astrbot.app/dev/star/plugin-new.html)
