@@ -1,7 +1,7 @@
 name: trigger_chat
 display_name: 对话触发
 desc: 关键词触发llm对话
-version: v0.0.1
+version: v0.0.2
 author: Tan
 repo: https://github.com/tan90-ninety/astrbot_plugin_trigger_chat.git
 support_platforms:
