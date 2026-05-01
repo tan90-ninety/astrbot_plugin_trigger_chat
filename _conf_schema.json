@@ -6,6 +6,6 @@
   "at_prompt": {
     "description": "单独 @ 机器人时发送给 LLM 的默认提示词",
     "type": "string",
-    "default": "你看看"
+    "default": "请根据上下文自然回复一下。如果上下文不足，请主动询问我需要你帮忙的具体内容。"
   }
 }

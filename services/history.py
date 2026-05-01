@@ -5,8 +5,7 @@ import time
 from astrbot.api.event import AstrMessageEvent
 
 
-HISTORY_LIMIT = 3
-HISTORY_WINDOW_SECONDS = 180
+HISTORY_WINDOW_SECONDS = 30
 
 
 class MessageHistory:
@@ -14,15 +13,15 @@ class MessageHistory:
 
     def __init__(
         self,
-        limit: int = HISTORY_LIMIT,
         window_seconds: int = HISTORY_WINDOW_SECONDS,
     ) -> None:
         """
-        设置缓存条数和时间窗口。
+        设置缓存时间窗口。
         """
-        self.limit = limit
         self.window_seconds = window_seconds
-        self._records: dict[tuple[str, str], list[tuple[float, str]]] = {}
+        # key 为 (群号, 用户 ID)，value 为该用户在该群内的上一条非触发消息。
+        # value 格式为 (发送时间戳, 消息文本)。
+        self._records: dict[tuple[str, str], tuple[float, str]] = {}
 
     def record(self, event: AstrMessageEvent, message: str) -> None:
         """
@@ -31,32 +30,27 @@ class MessageHistory:
         if not message:
             return
 
-        key = self._key(event)
-        now = time.time()
-        records = self._recent_records(key, now)
-        records.append((now, message))
-        self._records[key] = records[-self.limit :]
+        self._records[self._key(event)] = (time.time(), message)
 
     def build_prompt(self, event: AstrMessageEvent) -> str:
         """
-        取当前群当前用户时间窗口内最近的消息，并合并为 LLM prompt。
+        取当前群当前用户时间窗口内上一条消息，作为 LLM prompt。
         """
-        records = self._recent_records(self._key(event), time.time())[-self.limit :]
-        return "\n".join(message for _, message in records)
+        record = self._recent_record(self._key(event), time.time())
+        return record[1] if record else ""
 
-    def _recent_records(
+    def _recent_record(
         self,
         key: tuple[str, str],
         now: float,
-    ) -> list[tuple[float, str]]:
+    ) -> tuple[float, str] | None:
         """
-        过滤出仍在有效时间窗口内的缓存消息。
+        获取仍在有效时间窗口内的缓存消息。
         """
-        return [
-            record
-            for record in self._records.get(key, [])
-            if now - record[0] <= self.window_seconds
-        ]
+        record = self._records.get(key)
+        if not record or now - record[0] > self.window_seconds:
+            return None
+        return record
 
     @staticmethod
     def _key(event: AstrMessageEvent) -> tuple[str, str]:
