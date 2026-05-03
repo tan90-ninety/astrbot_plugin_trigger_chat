@@ -5,8 +5,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 
 from .services.config import get_at_prompt, get_keywords
-from .services.history import MessageHistory
-from .services.triggers import contains_keyword, is_only_at_bot, is_only_keyword
+from .services.triggers import contains_keyword, is_only_at_bot
 
 
 class TriggerChatPlugin(Star):
@@ -14,11 +13,10 @@ class TriggerChatPlugin(Star):
 
     def __init__(self, context: Context, config: AstrBotConfig):
         """
-        保存插件配置，并初始化按群和用户隔离的短期消息缓存。
+        保存插件配置。
         """
         super().__init__(context)
         self.config = config
-        self.history = MessageHistory()
 
     def _set_llm_prompt(self, event: AstrMessageEvent, prompt: str) -> None:
         """
@@ -32,22 +30,17 @@ class TriggerChatPlugin(Star):
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def call(self, event: AstrMessageEvent):
         """
-        仅处理群聊消息；单独 @/单独关键词使用历史，带上下文关键词使用当前消息。
+        仅处理群聊消息；关键词保留原始消息，纯 @ 改写为默认提示词。
         """
         message = event.message_str.strip()
         keywords = get_keywords(self.config)
         triggered_by_only_at = is_only_at_bot(event)
-        triggered_by_only_keyword = is_only_keyword(message, keywords)
         triggered_by_keyword = contains_keyword(message, keywords)
 
         if not triggered_by_only_at and not triggered_by_keyword:
-            self.history.record(event, message)
             return
 
-        if triggered_by_only_at or triggered_by_only_keyword:
-            prompt = self.history.build_prompt(event) or get_at_prompt(self.config)
-        else:
-            prompt = message
+        prompt = get_at_prompt(self.config) if triggered_by_only_at else message
 
         self._set_llm_prompt(event, prompt)
         trigger_type = "单独 @" if triggered_by_only_at else "关键词"

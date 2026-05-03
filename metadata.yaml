@@ -1,7 +1,7 @@
 name: astrbot_plugin_trigger_chat
 display_name: LLM 唤醒优化
 desc: 群聊关键词或单独 @ 触发默认 LLM 对话
-version: v0.0.4
+version: v0.1.0
 author: Tan
 repo: https://github.com/tan90-ninety/astrbot_plugin_trigger_chat.git
 support_platforms:
