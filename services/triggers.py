@@ -1,15 +1,17 @@
 """群聊触发条件判断工具。"""
 
 from astrbot.api.event import AstrMessageEvent
-from astrbot.api.message_components import At, Plain
+from astrbot.api.message_components import At, Plain, Reply
 
 
 def is_only_at_bot(event: AstrMessageEvent) -> bool:
     """
-    判断消息是否只包含 @机器人 和空白文本。
+    判断消息是否只包含引用消息、@机器人 和空白文本。
     """
     has_at_bot = False
     for message in event.get_messages():
+        if isinstance(message, Reply):
+            continue
         if isinstance(message, At):
             if str(message.qq) != str(event.get_self_id()):
                 return False

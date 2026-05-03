@@ -36,19 +36,19 @@ class TriggerChatPlugin(Star):
         """
         message = event.message_str.strip()
         keywords = get_keywords(self.config)
-        triggered_by_at = is_only_at_bot(event)
+        triggered_by_only_at = is_only_at_bot(event)
         triggered_by_only_keyword = is_only_keyword(message, keywords)
         triggered_by_keyword = contains_keyword(message, keywords)
 
-        if not triggered_by_at and not triggered_by_keyword:
+        if not triggered_by_only_at and not triggered_by_keyword:
             self.history.record(event, message)
             return
 
-        if triggered_by_at or triggered_by_only_keyword:
+        if triggered_by_only_at or triggered_by_only_keyword:
             prompt = self.history.build_prompt(event) or get_at_prompt(self.config)
         else:
             prompt = message
 
         self._set_llm_prompt(event, prompt)
-        trigger_type = "单独 @" if triggered_by_at else "关键词"
+        trigger_type = "单独 @" if triggered_by_only_at else "关键词"
         logger.info(f"{trigger_type}触发 LLM 对话: {event.message_str}")
