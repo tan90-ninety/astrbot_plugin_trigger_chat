@@ -22,6 +22,8 @@ class TriggerChatPlugin(Star):
         """
         将事件改写成 AstrBot 默认 LLM 流程可处理的唤醒消息。
         """
+        logger.log("原本的message_str:" + event.message_str)
+        logger.log("原本的message_obj:" + event.message_obj.message_str)
         event.message_str = prompt
         event.message_obj.message_str = prompt
         event.is_wake = True
